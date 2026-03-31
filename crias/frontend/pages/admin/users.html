@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Management - CRIAS Admin</title>
+  <link rel="stylesheet" href="../../css/main.css">
+  <link rel="stylesheet" href="../../css/components.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <div class="logo">CRIAS Admin</div>
+      <nav class="admin-nav">
+        <a href="/pages/admin/users.html" class="active">👥 Users</a>
+        <a href="/pages/admin/models.html">🤖 Models</a>
+        <a href="/pages/admin/logs.html">📋 Audit Logs</a>
+        <a href="/pages/dashboard.html">← Back to App</a>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-content">
+      <div class="page-header flex justify-between items-center">
+        <div>
+          <h1 class="page-title">User Management</h1>
+          <p class="page-subtitle">Manage user accounts and roles</p>
+        </div>
+      </div>
+
+      <div id="alertContainer"></div>
+
+      <!-- Stats -->
+      <div class="stats-grid mb-lg">
+        <div class="stat-card">
+          <div class="stat-value" id="totalUsers">-</div>
+          <div class="stat-label">Total Users</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="activeUsers">-</div>
+          <div class="stat-label">Active Users</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="adminCount">-</div>
+          <div class="stat-label">Administrators</div>
+        </div>
+      </div>
+
+      <!-- Users Table -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">All Users</h3>
+        </div>
+        <div class="admin-table-wrapper">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Last Login</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="usersTable">
+              <tr><td colspan="6" class="text-center">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="pagination"></div>
+      </div>
+    </main>
+
+    <!-- Edit Role Modal -->
+    <div id="editRoleModal" class="modal-overlay" style="display: none;" onclick="ui.hideModal('editRoleModal')">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h2 class="modal-title">Change User Role</h2>
+          <button class="modal-close" onclick="ui.hideModal('editRoleModal')">&times;</button>
+        </div>
+        <form id="editRoleForm">
+          <input type="hidden" id="editUserId" name="userId">
+          <div class="form-group">
+            <label class="form-label" for="newRole">Select Role</label>
+            <select id="newRole" name="role" class="form-select" required>
+              <option value="analyst">Analyst</option>
+              <option value="manager">Manager</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="ui.hideModal('editRoleModal')">Cancel</button>
+            <button type="submit" class="btn btn-primary">Update Role</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="../../js/api.js"></script>
+  <script src="../../js/auth.js"></script>
+  <script src="../../js/state.js"></script>
+  <script src="../../js/ui.js"></script>
+  <script>
+    let currentPage = 1;
+    const limit = 20;
+
+    async function loadUsers() {
+      try {
+        const data = await api.getUsers(currentPage, limit);
+        
+        // Update stats
+        document.getElementById('totalUsers').textContent = data.pagination.total;
+        document.getElementById('activeUsers').textContent = 
+          data.users.filter(u => u.isActive).length;
+        document.getElementById('adminCount').textContent = 
+          data.users.filter(u => u.role === 'admin').length;
+
+        // Render table
+        document.getElementById('usersTable').innerHTML = 
+          data.users.map(ui.userRow).join('');
+
+        // Pagination
+        document.getElementById('pagination').innerHTML = ui.pagination(
+          data.pagination.page,
+          data.pagination.pages,
+          'goToPage'
+        );
+      } catch (error) {
+        utils.showAlert(error.message, 'error');
+      }
+    }
+
+    function goToPage(page) {
+      currentPage = page;
+      loadUsers();
+    }
+
+    function editUserRole(userId, currentRole) {
+      document.getElementById('editUserId').value = userId;
+      document.getElementById('newRole').value = currentRole;
+      ui.showModal('editRoleModal');
+    }
+
+    async function deactivateUser(userId) {
+      if (!await ui.confirm('Are you sure you want to deactivate this user?')) {
+        return;
+      }
+
+      try {
+        await api.deactivateUser(userId);
+        utils.showAlert('User deactivated successfully', 'success');
+        loadUsers();
+      } catch (error) {
+        utils.showAlert(error.message, 'error');
+      }
+    }
+
+    document.getElementById('editRoleForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const userId = document.getElementById('editUserId').value;
+      const role = document.getElementById('newRole').value;
+
+      try {
+        await api.updateUserRole(userId, role);
+        ui.hideModal('editRoleModal');
+        utils.showAlert('User role updated successfully', 'success');
+        loadUsers();
+      } catch (error) {
+        utils.showAlert(error.message, 'error');
+      }
+    });
+
+    // Initialize
+    protectPage('admin').then(authenticated => {
+      if (authenticated) {
+        loadUsers();
+      }
+    });
+  </script>
+</body>
+</html>

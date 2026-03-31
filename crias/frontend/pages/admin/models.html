@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Model Management - CRIAS Admin</title>
+  <link rel="stylesheet" href="../../css/main.css">
+  <link rel="stylesheet" href="../../css/components.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <div class="logo">CRIAS Admin</div>
+      <nav class="admin-nav">
+        <a href="/pages/admin/users.html">👥 Users</a>
+        <a href="/pages/admin/models.html" class="active">🤖 Models</a>
+        <a href="/pages/admin/logs.html">📋 Audit Logs</a>
+        <a href="/pages/dashboard.html">← Back to App</a>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-content">
+      <div class="page-header">
+        <h1 class="page-title">Model Management</h1>
+        <p class="page-subtitle">Configure ML models for risk prediction</p>
+      </div>
+
+      <div id="alertContainer"></div>
+
+      <!-- Models Grid -->
+      <div class="grid grid-3" id="modelsGrid">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+
+      <!-- Model Info -->
+      <div class="card mt-lg">
+        <div class="card-header">
+          <h3 class="card-title">Model Details</h3>
+        </div>
+        <div class="admin-table-wrapper">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Property</th>
+                <th>Logistic Regression</th>
+                <th>Random Forest</th>
+                <th>XGBoost</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Type</strong></td>
+                <td>Linear Model</td>
+                <td>Ensemble (Bagging)</td>
+                <td>Ensemble (Boosting)</td>
+              </tr>
+              <tr>
+                <td><strong>Estimators</strong></td>
+                <td>N/A</td>
+                <td>100</td>
+                <td>200</td>
+              </tr>
+              <tr>
+                <td><strong>Max Depth</strong></td>
+                <td>N/A</td>
+                <td>10</td>
+                <td>6</td>
+              </tr>
+              <tr>
+                <td><strong>Learning Rate</strong></td>
+                <td>N/A</td>
+                <td>N/A</td>
+                <td>0.05</td>
+              </tr>
+              <tr>
+                <td><strong>Class Balancing</strong></td>
+                <td>class_weight='balanced'</td>
+                <td>class_weight='balanced'</td>
+                <td>scale_pos_weight</td>
+              </tr>
+              <tr>
+                <td><strong>Best For</strong></td>
+                <td>Fast inference, interpretability</td>
+                <td>Balanced accuracy</td>
+                <td>Highest accuracy</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Feature Engineering Info -->
+      <div class="card mt-lg">
+        <div class="card-header">
+          <h3 class="card-title">Feature Engineering</h3>
+        </div>
+        <p class="mb-md">The following features are computed from raw financial data:</p>
+        <div class="admin-table-wrapper">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Feature</th>
+                <th>Formula</th>
+                <th>Interpretation</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Current Ratio</strong></td>
+                <td><code>assets / debt</code></td>
+                <td>Higher is better. Measures ability to pay short-term obligations.</td>
+              </tr>
+              <tr>
+                <td><strong>Debt Ratio</strong></td>
+                <td><code>debt / assets</code></td>
+                <td>Lower is better. Proportion of assets financed by debt.</td>
+              </tr>
+              <tr>
+                <td><strong>Liquidity Ratio</strong></td>
+                <td><code>cash / debt</code></td>
+                <td>Higher is better. Ability to pay debt with liquid assets.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- RCES Formula -->
+      <div class="card mt-lg">
+        <div class="card-header">
+          <h3 class="card-title">RCES Formula</h3>
+        </div>
+        <p class="mb-md">Risk-Cost-Effectiveness Score ranks counterfactual strategies:</p>
+        <div class="card" style="background: var(--bg-tertiary); font-family: monospace; padding: 20px;">
+          <p><strong>RCES</strong> = (PD_old - PD_new) / (cost + 1)</p>
+          <br>
+          <p><strong>Cost</strong> = |Δinventory| × 0.001 + |Δcash| × 0.001 + |Δdebt| × 0.002</p>
+        </div>
+        <p class="mt-md text-muted">Higher RCES indicates more cost-effective risk reduction.</p>
+      </div>
+    </main>
+  </div>
+
+  <script src="../../js/api.js"></script>
+  <script src="../../js/auth.js"></script>
+  <script src="../../js/state.js"></script>
+  <script src="../../js/ui.js"></script>
+  <script>
+    async function loadModels() {
+      try {
+        const data = await api.getModels();
+        
+        document.getElementById('modelsGrid').innerHTML = data.models.map(model => `
+          <div class="card ${model.isActive ? 'active-model' : ''}" style="${model.isActive ? 'border-color: var(--primary); background: rgba(37, 99, 235, 0.05);' : ''}">
+            <div class="flex justify-between items-center mb-md">
+              <h4>${model.displayName}</h4>
+              ${model.isActive ? '<span class="badge badge-low">Active</span>' : ''}
+            </div>
+            <p class="text-sm text-muted mb-md">${model.description}</p>
+            <p class="text-sm">Version: ${model.version}</p>
+            ${!model.isActive ? `
+              <button class="btn btn-secondary mt-md" onclick="setActiveModel('${model.name}')">
+                Set as Active
+              </button>
+            ` : ''}
+          </div>
+        `).join('');
+      } catch (error) {
+        utils.showAlert(error.message, 'error');
+      }
+    }
+
+    async function setActiveModel(modelName) {
+      try {
+        await api.setActiveModel(modelName);
+        utils.showAlert('Active model updated successfully', 'success');
+        loadModels();
+      } catch (error) {
+        utils.showAlert(error.message, 'error');
+      }
+    }
+
+    // Initialize
+    protectPage('admin').then(authenticated => {
+      if (authenticated) {
+        loadModels();
+      }
+    });
+  </script>
+</body>
+</html>

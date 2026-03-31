@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - CRIAS</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <div class="auth-page">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <h1>CRIAS</h1>
+        <p>Credit Risk Intelligence & Advisory System</p>
+      </div>
+
+      <div id="alertContainer"></div>
+
+      <!-- Google Sign-In Button -->
+      <div id="googleSignIn" style="display: flex; justify-content: center; margin-bottom: 20px;">
+        <div id="g_id_onload"
+             data-client_id="YOUR_GOOGLE_CLIENT_ID"
+             data-callback="handleGoogleLogin"
+             data-auto_prompt="false">
+        </div>
+        <div class="g_id_signin"
+             data-type="standard"
+             data-size="large"
+             data-theme="outline"
+             data-text="sign_in_with"
+             data-shape="rectangular"
+             data-logo_alignment="left"
+             data-width="320">
+        </div>
+      </div>
+
+      <div class="divider" style="display: flex; align-items: center; margin: 20px 0;">
+        <hr style="flex: 1; border: none; border-top: 1px solid var(--border-color);">
+        <span style="padding: 0 10px; color: var(--text-muted); font-size: 14px;">or</span>
+        <hr style="flex: 1; border: none; border-top: 1px solid var(--border-color);">
+      </div>
+
+      <form id="loginForm">
+        <div class="form-group">
+          <label class="form-label" for="email">Email</label>
+          <input type="email" id="email" name="email" class="form-input" required 
+                 placeholder="Enter your email">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">Password</label>
+          <input type="password" id="password" name="password" class="form-input" required 
+                 placeholder="Enter your password">
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" data-original-text="Sign In">
+          Sign In
+        </button>
+      </form>
+
+      <p class="text-center mt-lg text-muted">
+        Don't have an account? <a href="/pages/register.html">Register</a>
+      </p>
+    </div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/state.js"></script>
+  <script>
+    // Redirect if already logged in
+    if (localStorage.getItem('crias_token')) {
+      window.location.href = '/pages/dashboard.html';
+    }
+
+    // Handle Google Login
+    async function handleGoogleLogin(response) {
+      try {
+        const result = await fetch('/api/auth/google', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential: response.credential })
+        });
+        
+        const data = await result.json();
+        
+        if (!result.ok) {
+          throw new Error(data.detail || 'Google login failed');
+        }
+        
+        localStorage.setItem('crias_token', data.token);
+        window.location.href = '/pages/dashboard.html';
+      } catch (error) {
+        utils.showAlert(error.message, 'error');
+      }
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Signing in...';
+
+      try {
+        await api.login(email, password);
+        window.location.href = '/pages/dashboard.html';
+      } catch (error) {
+        utils.showAlert(error.message, 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Sign In';
+      }
+    });
+  </script>
+</body>
+</html>

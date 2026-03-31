@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audit Logs - CRIAS Admin</title>
+  <link rel="stylesheet" href="../../css/main.css">
+  <link rel="stylesheet" href="../../css/components.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <div class="logo">CRIAS Admin</div>
+      <nav class="admin-nav">
+        <a href="/pages/admin/users.html">👥 Users</a>
+        <a href="/pages/admin/models.html">🤖 Models</a>
+        <a href="/pages/admin/logs.html" class="active">📋 Audit Logs</a>
+        <a href="/pages/dashboard.html">← Back to App</a>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-content">
+      <div class="page-header">
+        <h1 class="page-title">Audit Logs</h1>
+        <p class="page-subtitle">System activity and security events</p>
+      </div>
+
+      <div id="alertContainer"></div>
+
+      <!-- Filters -->
+      <div class="card mb-lg">
+        <div class="flex gap-md items-center flex-wrap">
+          <div class="form-group" style="margin: 0;">
+            <select id="actionFilter" class="form-select" onchange="loadLogs()">
+              <option value="">All Actions</option>
+              <option value="login">Login</option>
+              <option value="logout">Logout</option>
+              <option value="predict">Predict</option>
+              <option value="upload">Upload</option>
+              <option value="create">Create</option>
+              <option value="update">Update</option>
+              <option value="delete">Delete</option>
+              <option value="admin_action">Admin Action</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <select id="statusFilter" class="form-select" onchange="loadLogs()">
+              <option value="">All Status</option>
+              <option value="success">Success</option>
+              <option value="failure">Failure</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <input type="date" id="startDate" class="form-input" onchange="loadLogs()" 
+                   placeholder="Start Date">
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <input type="date" id="endDate" class="form-input" onchange="loadLogs()" 
+                   placeholder="End Date">
+          </div>
+          <button class="btn btn-secondary" onclick="clearFilters()">Clear Filters</button>
+        </div>
+      </div>
+
+      <!-- Logs Table -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Activity Log</h3>
+          <span class="text-muted text-sm">Logs are retained for 365 days</span>
+        </div>
+        <div class="admin-table-wrapper">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>User</th>
+                <th>Action</th>
+                <th>Resource</th>
+                <th>Status</th>
+                <th>IP Address</th>
+              </tr>
+            </thead>
+            <tbody id="logsTable">
+              <tr><td colspan="6" class="text-center">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="pagination"></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../../js/api.js"></script>
+  <script src="../../js/auth.js"></script>
+  <script src="../../js/state.js"></script>
+  <script src="../../js/ui.js"></script>
+  <script>
+    let currentPage = 1;
+    const limit = 50;
+
+    async function loadLogs() {
+      const action = document.getElementById('actionFilter').value;
+      const status = document.getElementById('statusFilter').value;
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value;
+      
+      const tbody = document.getElementById('logsTable');
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center">Loading...</td></tr>';
+
+      try {
+        const filters = {};
+        if (action) filters.action = action;
+        if (startDate) filters.startDate = startDate;
+        if (endDate) filters.endDate = endDate;
+
+        const data = await api.getAuditLogs(currentPage, limit, filters);
+        
+        let logs = data.logs;
+        if (status) {
+          logs = logs.filter(l => l.status === status);
+        }
+
+        if (logs.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No logs found</td></tr>';
+          document.getElementById('pagination').innerHTML = '';
+          return;
+        }
+
+        tbody.innerHTML = logs.map(ui.auditLogRow).join('');
+
+        // Pagination
+        document.getElementById('pagination').innerHTML = ui.pagination(
+          data.pagination.page,
+          data.pagination.pages,
+          'goToPage'
+        );
+      } catch (error) {
+        utils.showAlert(error.message, 'error');
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Error loading logs</td></tr>';
+      }
+    }
+
+    function goToPage(page) {
+      currentPage = page;
+      loadLogs();
+    }
+
+    function clearFilters() {
+      document.getElementById('actionFilter').value = '';
+      document.getElementById('statusFilter').value = '';
+      document.getElementById('startDate').value = '';
+      document.getElementById('endDate').value = '';
+      currentPage = 1;
+      loadLogs();
+    }
+
+    // Initialize
+    protectPage('admin').then(authenticated => {
+      if (authenticated) {
+        loadLogs();
+      }
+    });
+  </script>
+</body>
+</html>

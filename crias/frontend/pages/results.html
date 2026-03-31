@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analysis Results - CRIAS</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="page-wrapper">
+    <!-- Header -->
+    <header class="header">
+      <div class="container">
+        <a href="/pages/dashboard.html" class="logo">CRIAS</a>
+        <nav class="nav">
+          <a href="/pages/dashboard.html">Dashboard</a>
+          <a href="/pages/analyze.html">New Analysis</a>
+          <a href="/pages/history.html">History</a>
+          <a href="/pages/admin/users.html" class="admin-only">Admin</a>
+        </nav>
+        <div class="user-menu">
+          <span id="userName" class="user-name">Loading...</span>
+          <span id="userRole" class="badge">-</span>
+          <button class="btn btn-secondary" onclick="auth.logout()">Logout</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+      <div class="container">
+        <div class="page-header flex justify-between items-center">
+          <div>
+            <h1 class="page-title" id="pageTitle">Analysis Results</h1>
+            <p class="page-subtitle" id="pageSubtitle">Loading...</p>
+          </div>
+          <a href="/pages/analyze.html" class="btn btn-primary">New Analysis</a>
+        </div>
+
+        <div id="alertContainer"></div>
+
+        <!-- Results Grid -->
+        <div class="results-grid">
+          <!-- Left Column -->
+          <div>
+            <!-- PD Score Card -->
+            <div class="card mb-lg">
+              <div class="card-header">
+                <h3 class="card-title">Probability of Default</h3>
+              </div>
+              <div id="pdScoreContainer">
+                <div class="loading"><div class="spinner"></div></div>
+              </div>
+            </div>
+
+            <!-- SHAP Explanation -->
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">Risk Factors (SHAP)</h3>
+              </div>
+              <p class="text-sm text-muted mb-md">
+                Positive values (red) increase risk, negative values (green) decrease risk
+              </p>
+              <div id="shapChart" class="shap-chart">
+                <div class="loading"><div class="spinner"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column -->
+          <div>
+            <!-- Financial Metrics -->
+            <div class="card mb-lg">
+              <div class="card-header">
+                <h3 class="card-title">Financial Metrics</h3>
+              </div>
+              <div class="chart-container" style="height: 250px;">
+                <canvas id="metricsChart"></canvas>
+              </div>
+              <div id="metricsDetails" class="mt-md">
+                <div class="loading"><div class="spinner"></div></div>
+              </div>
+            </div>
+
+            <!-- Raw Data -->
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">Input Data</h3>
+              </div>
+              <div id="rawData">
+                <div class="loading"><div class="spinner"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Strategies Section -->
+        <div class="card mt-lg">
+          <div class="card-header">
+            <h3 class="card-title">Recommended Strategies</h3>
+            <button class="btn btn-secondary" id="generateStrategiesBtn" onclick="generateStrategies()">
+              Generate Strategies
+            </button>
+          </div>
+          <p class="text-sm text-muted mb-md">
+            AI-generated counterfactual scenarios ranked by cost-effectiveness (RCES)
+          </p>
+          <div id="strategiesContainer">
+            <div class="empty-state">
+              <p>Click "Generate Strategies" to compute improvement recommendations</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/state.js"></script>
+  <script src="../js/ui.js"></script>
+  <script src="../js/charts.js"></script>
+  <script>
+    const params = utils.getUrlParams();
+    const predictionId = params.predictionId;
+    let currentPrediction = null;
+
+    if (!predictionId) {
+      window.location.href = '/pages/dashboard.html';
+    }
+
+    async function loadPrediction() {
+      try {
+        // Get prediction details - need to construct from available endpoints
+        // We'll use the explain endpoint which includes prediction info
+        const explainResult = await api.explain(predictionId);
+        
+        // Load the actual prediction data
+        // Since we don't have a direct get prediction endpoint, we'll parse from URL
+        // and load firm's latest prediction
+        
+        // For now, we'll show a simplified view
+        document.getElementById('pdScoreContainer').innerHTML = `
+          <div class="pd-score">
+            <div class="pd-value" id="pdValue">-</div>
+            <div class="pd-label" id="riskLabel">Loading...</div>
+          </div>
+        `;
+        
+        // Show SHAP values
+        if (explainResult.shapValues) {
+          charts.createSHAPChart('shapChart', explainResult.shapValues);
+        }
+      } catch (error) {
+        utils.showAlert(error.message, 'error');
+      }
+    }
+
+    async function loadFullData() {
+      try {
+        // This is a workaround since we don't have a direct prediction GET endpoint
+        // In a real app, you'd add GET /api/predict/:id endpoint
+        
+        document.getElementById('pageSubtitle').textContent = `Prediction ID: ${predictionId}`;
+        
+        // Try to load SHAP explanation
+        try {
+          const explainResult = await api.explain(predictionId);
+          if (explainResult.shapValues && explainResult.shapValues.length > 0) {
+            charts.createSHAPChart('shapChart', explainResult.shapValues);
+          }
+        } catch (e) {
+          document.getElementById('shapChart').innerHTML = 
+            '<p class="text-muted">SHAP values not available</p>';
+        }
+
+        // Show placeholder for now
+        document.getElementById('pdScoreContainer').innerHTML = `
+          <div class="pd-score">
+            <div class="pd-value medium">--</div>
+            <div class="pd-label">Prediction loaded</div>
+            <p class="text-muted text-sm mt-md">View firm page for full details</p>
+          </div>
+        `;
+
+        document.getElementById('metricsDetails').innerHTML = `
+          <p class="text-muted text-center">Metrics calculated from financial data</p>
+        `;
+
+        document.getElementById('rawData').innerHTML = `
+          <p class="text-muted text-center">Financial data used for this prediction</p>
+        `;
+
+      } catch (error) {
+        utils.showAlert(error.message, 'error');
+      }
+    }
+
+    async function generateStrategies() {
+      const btn = document.getElementById('generateStrategiesBtn');
+      const container = document.getElementById('strategiesContainer');
+      
+      btn.disabled = true;
+      btn.textContent = 'Generating...';
+      container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+      try {
+        // First generate counterfactuals
+        await api.generateCounterfactuals(predictionId, 0.30);
+        
+        // Then get ranked strategies
+        const result = await api.getStrategies(predictionId);
+        
+        if (result.strategies && result.strategies.length > 0) {
+          container.innerHTML = `
+            <div class="strategy-list">
+              ${result.strategies.map(ui.strategyCard).join('')}
+            </div>
+          `;
+        } else {
+          container.innerHTML = `
+            <div class="empty-state">
+              <p>No improvement strategies found. The current risk level may already be optimal.</p>
+            </div>
+          `;
+        }
+      } catch (error) {
+        utils.showAlert(error.message, 'error');
+        container.innerHTML = `
+          <div class="alert alert-error">
+            Failed to generate strategies: ${error.message}
+          </div>
+        `;
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Generate Strategies';
+    }
+
+    // Initialize
+    protectPage().then(authenticated => {
+      if (authenticated) {
+        loadFullData();
+      }
+    });
+  </script>
+</body>
+</html>

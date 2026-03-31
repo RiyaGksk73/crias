@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Risk Analysis - CRIAS</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/components.css">
+</head>
+<body>
+  <div class="page-wrapper">
+    <!-- Header -->
+    <header class="header">
+      <div class="container">
+        <a href="/pages/dashboard.html" class="logo">CRIAS</a>
+        <nav class="nav">
+          <a href="/pages/dashboard.html">Dashboard</a>
+          <a href="/pages/analyze.html" class="active">New Analysis</a>
+          <a href="/pages/history.html">History</a>
+          <a href="/pages/admin/users.html" class="admin-only">Admin</a>
+        </nav>
+        <div class="user-menu">
+          <span id="userName" class="user-name">Loading...</span>
+          <span id="userRole" class="badge">-</span>
+          <button class="btn btn-secondary" onclick="auth.logout()">Logout</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+      <div class="container">
+        <div class="page-header">
+          <h1 class="page-title">Risk Analysis</h1>
+          <p class="page-subtitle">Run probability of default prediction</p>
+        </div>
+
+        <div id="alertContainer"></div>
+
+        <div class="card analysis-form">
+          <form id="analysisForm">
+            <!-- Firm Selection -->
+            <div class="form-group">
+              <label class="form-label" for="firmId">Select Firm</label>
+              <select id="firmId" name="firmId" class="form-select" required>
+                <option value="">Loading firms...</option>
+              </select>
+            </div>
+
+            <!-- Financial Entry Selection -->
+            <div class="form-group" id="entryGroup" style="display: none;">
+              <label class="form-label" for="entryId">Financial Data</label>
+              <select id="entryId" name="entryId" class="form-select">
+                <option value="">Use latest entry</option>
+              </select>
+              <p class="text-sm text-muted mt-sm">Select a specific period or use the latest available data</p>
+            </div>
+
+            <!-- Model Selection -->
+            <div class="form-group">
+              <label class="form-label">Select Model</label>
+              <div class="model-selector">
+                <label class="model-option selected" id="modelXgboost">
+                  <input type="radio" name="modelName" value="xgboost" checked>
+                  <div class="model-name">XGBoost</div>
+                  <div class="model-desc">Default • Most accurate</div>
+                </label>
+                <label class="model-option" id="modelRf">
+                  <input type="radio" name="modelName" value="random_forest">
+                  <div class="model-name">Random Forest</div>
+                  <div class="model-desc">Ensemble model</div>
+                </label>
+                <label class="model-option" id="modelLr">
+                  <input type="radio" name="modelName" value="logistic_regression">
+                  <div class="model-name">Logistic Regression</div>
+                  <div class="model-desc">Fast • Baseline</div>
+                </label>
+              </div>
+            </div>
+
+            <!-- Or Submit New Data -->
+            <div class="card mt-lg" style="background: var(--bg-tertiary);">
+              <h4 class="mb-md">Or Submit New Financial Data</h4>
+              <div class="form-group">
+                <label class="form-label" for="reportingPeriod">Reporting Period</label>
+                <input type="date" id="reportingPeriod" name="reportingPeriod" class="form-input">
+              </div>
+              <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                <div class="form-group">
+                  <label class="form-label" for="assets">Total Assets ($)</label>
+                  <input type="number" id="assets" name="assets" class="form-input" min="0" step="0.01">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="debt">Total Debt ($)</label>
+                  <input type="number" id="debt" name="debt" class="form-input" min="0.01" step="0.01">
+                </div>
+              </div>
+              <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                <div class="form-group">
+                  <label class="form-label" for="cash">Cash ($)</label>
+                  <input type="number" id="cash" name="cash" class="form-input" min="0" step="0.01">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="inventory">Inventory ($)</label>
+                  <input type="number" id="inventory" name="inventory" class="form-input" min="0" step="0.01">
+                </div>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block mt-lg" id="submitBtn">
+              Run Prediction
+            </button>
+          </form>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/state.js"></script>
+  <script src="../js/ui.js"></script>
+  <script>
+    const params = utils.getUrlParams();
+    
+    // Model selection
+    document.querySelectorAll('.model-option').forEach(option => {
+      option.addEventListener('click', () => {
+        document.querySelectorAll('.model-option').forEach(o => o.classList.remove('selected'));
+        option.classList.add('selected');
+      });
+    });
+
+    async function loadFirms() {
+      try {
+        const data = await api.getFirms(1, 100);
+        const select = document.getElementById('firmId');
+        
+        select.innerHTML = '<option value="">Select a firm...</option>' + 
+          data.firms.map(firm => 
+            `<option value="${firm._id}">${firm.firmName} (${firm.firmCode})</option>`
+          ).join('');
+        
+        // Pre-select if firmId in URL
+        if (params.firmId) {
+          select.value = params.firmId;
+          loadEntries(params.firmId);
+        }
+      } catch (error) {
+        utils.showAlert(error.message, 'error');
+      }
+    }
+
+    async function loadEntries(firmId) {
+      if (!firmId) {
+        document.getElementById('entryGroup').style.display = 'none';
+        return;
+      }
+
+      try {
+        const data = await api.getFirmEntries(firmId, 1, 50);
+        const select = document.getElementById('entryId');
+        
+        if (data.entries.length > 0) {
+          select.innerHTML = '<option value="">Use latest entry</option>' + 
+            data.entries.map(entry => 
+              `<option value="${entry._id}">${utils.formatDate(entry.reportingPeriod)} - Assets: ${utils.formatCurrency(entry.raw.assets)}</option>`
+            ).join('');
+          document.getElementById('entryGroup').style.display = 'block';
+        } else {
+          document.getElementById('entryGroup').style.display = 'none';
+        }
+      } catch (error) {
+        console.error('Error loading entries:', error);
+      }
+    }
+
+    document.getElementById('firmId').addEventListener('change', (e) => {
+      loadEntries(e.target.value);
+    });
+
+    document.getElementById('analysisForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const firmId = document.getElementById('firmId').value;
+      
+      if (!firmId) {
+        utils.showAlert('Please select a firm', 'error');
+        return;
+      }
+      
+      const entryId = document.getElementById('entryId').value || null;
+      const modelName = document.querySelector('input[name="modelName"]:checked').value;
+      
+      // Check if new data is being submitted
+      const reportingPeriod = document.getElementById('reportingPeriod').value;
+      const assets = document.getElementById('assets').value;
+      const debt = document.getElementById('debt').value;
+      const cash = document.getElementById('cash').value;
+      const inventory = document.getElementById('inventory').value;
+      
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Running prediction...';
+
+      try {
+        // Submit new data if all fields provided
+        if (reportingPeriod && assets && debt && cash && inventory) {
+          console.log('Submitting new financial data...');
+          await api.submitFinancialData(firmId, {
+            reportingPeriod,
+            assets: parseFloat(assets),
+            debt: parseFloat(debt),
+            cash: parseFloat(cash),
+            inventory: parseFloat(inventory)
+          });
+        }
+
+        console.log('Running prediction for firm:', firmId, 'model:', modelName);
+        console.log('Token present:', !!api.getToken());
+        
+        // Run prediction
+        const result = await api.predict(firmId, entryId, modelName);
+        console.log('Prediction result:', result);
+        
+        if (result && result.prediction && result.prediction._id) {
+          // Redirect to results page
+          window.location.href = `/pages/results.html?predictionId=${result.prediction._id}`;
+        } else {
+          console.error('Unexpected result format:', result);
+          utils.showAlert('Unexpected response format', 'error');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Run Prediction';
+        }
+      } catch (error) {
+        console.error('Prediction error details:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        });
+        utils.showAlert(error.message || 'Prediction failed', 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Run Prediction';
+      }
+    });
+
+    // Initialize
+    protectPage().then(authenticated => {
+      if (authenticated) {
+        loadFirms();
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Firm Details - CRIAS</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="page-wrapper">
+    <!-- Header -->
+    <header class="header">
+      <div class="container">
+        <a href="/pages/dashboard.html" class="logo">CRIAS</a>
+        <nav class="nav">
+          <a href="/pages/dashboard.html">Dashboard</a>
+          <a href="/pages/analyze.html">New Analysis</a>
+          <a href="/pages/history.html">History</a>
+          <a href="/pages/admin/users.html" class="admin-only">Admin</a>
+        </nav>
+        <div class="user-menu">
+          <span id="userName" class="user-name">Loading...</span>
+          <span id="userRole" class="badge">-</span>
+          <button class="btn btn-secondary" onclick="auth.logout()">Logout</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+      <div class="container">
+        <div id="alertContainer"></div>
+
+        <!-- Firm Header -->
+        <div class="card mb-lg" id="firmHeader">
+          <div class="loading"><div class="spinner"></div></div>
+        </div>
+
+        <!-- Content Grid -->
+        <div class="grid grid-2">
+          <!-- Latest Prediction -->
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Latest Prediction</h3>
+              <a href="#" id="runAnalysisBtn" class="btn btn-primary">Run New Analysis</a>
+            </div>
+            <div id="latestPrediction">
+              <div class="loading"><div class="spinner"></div></div>
+            </div>
+          </div>
+
+          <!-- PD Trend Chart -->
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">PD Trend</h3>
+            </div>
+            <div class="chart-container">
+              <canvas id="pdTrendChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Financial Entries -->
+        <div class="card mt-lg">
+          <div class="card-header">
+            <h3 class="card-title">Financial Entries</h3>
+            <button class="btn btn-secondary" onclick="ui.showModal('submitDataModal')">
+              + Submit Data
+            </button>
+          </div>
+          <div class="admin-table-wrapper">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Period</th>
+                  <th>Assets</th>
+                  <th>Debt</th>
+                  <th>Cash</th>
+                  <th>Inventory</th>
+                  <th>Current Ratio</th>
+                  <th>Debt Ratio</th>
+                  <th>Liquidity Ratio</th>
+                </tr>
+              </thead>
+              <tbody id="entriesTable">
+                <tr><td colspan="8" class="text-center">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="entriesPagination"></div>
+        </div>
+
+        <!-- Prediction History -->
+        <div class="card mt-lg">
+          <div class="card-header">
+            <h3 class="card-title">Prediction History</h3>
+          </div>
+          <div class="admin-table-wrapper">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>PD</th>
+                  <th>Risk Level</th>
+                  <th>Model</th>
+                  <th>Analyst</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="predictionsTable">
+                <tr><td colspan="6" class="text-center">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Submit Data Modal -->
+    <div id="submitDataModal" class="modal-overlay" style="display: none;" onclick="ui.hideModal('submitDataModal')">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h2 class="modal-title">Submit Financial Data</h2>
+          <button class="modal-close" onclick="ui.hideModal('submitDataModal')">&times;</button>
+        </div>
+        <form id="submitDataForm">
+          <div class="form-group">
+            <label class="form-label" for="reportingPeriod">Reporting Period</label>
+            <input type="date" id="reportingPeriod" name="reportingPeriod" class="form-input" required>
+          </div>
+          <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+            <div class="form-group">
+              <label class="form-label" for="assets">Total Assets ($)</label>
+              <input type="number" id="assets" name="assets" class="form-input" required min="0" step="0.01">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="debt">Total Debt ($)</label>
+              <input type="number" id="debt" name="debt" class="form-input" required min="0.01" step="0.01">
+            </div>
+          </div>
+          <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+            <div class="form-group">
+              <label class="form-label" for="cash">Cash ($)</label>
+              <input type="number" id="cash" name="cash" class="form-input" required min="0" step="0.01">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="inventory">Inventory ($)</label>
+              <input type="number" id="inventory" name="inventory" class="form-input" required min="0" step="0.01">
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="ui.hideModal('submitDataModal')">Cancel</button>
+            <button type="submit" class="btn btn-primary">Submit</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/state.js"></script>
+  <script src="../js/ui.js"></script>
+  <script src="../js/charts.js"></script>
+  <script>
+    const params = utils.getUrlParams();
+    const firmId = params.id;
+
+    if (!firmId) {
+      window.location.href = '/pages/dashboard.html';
+    }
+
+    async function loadFirm() {
+      try {
+        const data = await api.getFirm(firmId);
+        const firm = data.firm;
+        
+        document.getElementById('firmHeader').innerHTML = `
+          <div class="flex justify-between items-center">
+            <div>
+              <h1 class="page-title">${firm.firmName}</h1>
+              <p class="page-subtitle">
+                <span class="firm-code">${firm.firmCode}</span>
+                ${firm.industry ? ` • ${firm.industry}` : ''}
+              </p>
+            </div>
+            <div class="flex gap-md">
+              <button class="btn btn-secondary" onclick="editFirm()">Edit</button>
+              <button class="btn btn-danger admin-only" onclick="deleteFirm()">Delete</button>
+            </div>
+          </div>
+        `;
+
+        document.getElementById('runAnalysisBtn').href = `/pages/analyze.html?firmId=${firmId}`;
+      } catch (error) {
+        utils.showAlert(error.message, 'error');
+      }
+    }
+
+    async function loadLatestPrediction() {
+      const container = document.getElementById('latestPrediction');
+      
+      try {
+        const data = await api.getLatestPrediction(firmId);
+        const prediction = data.prediction;
+        
+        if (!prediction) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <p>No predictions yet</p>
+              <a href="/pages/analyze.html?firmId=${firmId}" class="btn btn-primary mt-md">
+                Run First Analysis
+              </a>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = `
+          <div class="pd-score">
+            <div class="pd-value ${prediction.riskLabel}">${(prediction.pd * 100).toFixed(1)}%</div>
+            <div class="pd-label">${prediction.riskLabel} Risk</div>
+            <p class="text-muted text-sm mt-md">
+              ${prediction.modelUsed} • ${utils.formatDateTime(prediction.createdAt)}
+            </p>
+          </div>
+          <div class="flex justify-between mt-lg">
+            <a href="/pages/results.html?predictionId=${prediction._id}" class="btn btn-secondary">
+              View Details
+            </a>
+          </div>
+        `;
+      } catch (error) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <p>No predictions yet</p>
+            <a href="/pages/analyze.html?firmId=${firmId}" class="btn btn-primary mt-md">
+              Run First Analysis
+            </a>
+          </div>
+        `;
+      }
+    }
+
+    async function loadPredictions() {
+      try {
+        const data = await api.getPredictionHistory(firmId, 1, 10);
+        
+        if (data.predictions.length === 0) {
+          document.getElementById('predictionsTable').innerHTML = 
+            '<tr><td colspan="6" class="text-center text-muted">No predictions yet</td></tr>';
+          return;
+        }
+
+        document.getElementById('predictionsTable').innerHTML = 
+          data.predictions.map(ui.predictionRow).join('');
+        
+        // Create trend chart
+        charts.createPDTrendChart('pdTrendChart', data.predictions);
+      } catch (error) {
+        console.error('Error loading predictions:', error);
+      }
+    }
+
+    async function loadEntries() {
+      try {
+        const data = await api.getFirmEntries(firmId, 1, 10);
+        
+        if (data.entries.length === 0) {
+          document.getElementById('entriesTable').innerHTML = 
+            '<tr><td colspan="8" class="text-center text-muted">No financial data yet</td></tr>';
+          return;
+        }
+
+        document.getElementById('entriesTable').innerHTML = data.entries.map(entry => `
+          <tr>
+            <td>${utils.formatDate(entry.reportingPeriod)}</td>
+            <td>${utils.formatCurrency(entry.raw.assets)}</td>
+            <td>${utils.formatCurrency(entry.raw.debt)}</td>
+            <td>${utils.formatCurrency(entry.raw.cash)}</td>
+            <td>${utils.formatCurrency(entry.raw.inventory)}</td>
+            <td>${entry.features.current_ratio.toFixed(2)}</td>
+            <td>${entry.features.debt_ratio.toFixed(2)}</td>
+            <td>${entry.features.liquidity_ratio.toFixed(2)}</td>
+          </tr>
+        `).join('');
+      } catch (error) {
+        console.error('Error loading entries:', error);
+      }
+    }
+
+    function viewPrediction(predictionId) {
+      window.location.href = `/pages/results.html?predictionId=${predictionId}`;
+    }
+
+    async function deleteFirm() {
+      if (!await ui.confirm('Are you sure you want to delete this firm? This action cannot be undone.')) {
+        return;
+      }
+
+      try {
+        await api.deleteFirm(firmId);
+        utils.showAlert('Firm deleted successfully', 'success');
+        setTimeout(() => {
+          window.location.href = '/pages/dashboard.html';
+        }, 1000);
+      } catch (error) {
+        utils.showAlert(error.message, 'error');
+      }
+    }
+
+    // Submit data form
+    document.getElementById('submitDataForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = ui.getFormData('submitDataForm');
+      
+      // Convert to numbers
+      formData.assets = parseFloat(formData.assets);
+      formData.debt = parseFloat(formData.debt);
+      formData.cash = parseFloat(formData.cash);
+      formData.inventory = parseFloat(formData.inventory);
+      
+      try {
+        await api.submitFinancialData(firmId, formData);
+        ui.hideModal('submitDataModal');
+        utils.showAlert('Financial data submitted successfully', 'success');
+        loadEntries();
+        e.target.reset();
+      } catch (error) {
+        utils.showAlert(error.message, 'error');
+      }
+    });
+
+    // Initialize
+    protectPage().then(authenticated => {
+      if (authenticated) {
+        loadFirm();
+        loadLatestPrediction();
+        loadPredictions();
+        loadEntries();
+      }
+    });
+  </script>
+</body>
+</html>
