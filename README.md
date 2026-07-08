@@ -18,7 +18,7 @@ mongod
 
 ### 2. Configure environment
 ```bash
-cd crias
+# from the repo root
 cp backend/.env.example backend/.env   # then edit MONGODB_URI + JWT_SECRET
 ```
 
@@ -30,10 +30,10 @@ npm run dev
 
 ### 4. Access the App
 Open http://localhost:3000/pages/login.html
+(Optional: `node backend/scripts/seedMockData.js` to add demo firms/predictions.)
 
-> Python is only needed to *regenerate* `backend/src/ml/models.json` from the
-> original scikit-learn models (see `ai-service/export_models.py`). It is not
-> required to run or deploy the app.
+> No Python is needed to run or deploy — the ML runs in Node from
+> `backend/src/ml/models.json`.
 
 ## Google OAuth Setup
 
@@ -53,7 +53,8 @@ Open http://localhost:3000/pages/login.html
 Full step-by-step instructions are in **[DEPLOY.md](./DEPLOY.md)**. In short:
 
 1. Create a MongoDB Atlas cluster (allow access from `0.0.0.0/0`).
-2. Import the repo into Vercel, set **Root Directory = `crias`**.
+2. Import the repo into Vercel — Root Directory = **repo root** (default),
+   Application Preset = **Other**.
 3. Add env vars: `MONGODB_URI`, `JWT_SECRET`, `NODE_ENV=production`.
 4. Deploy, then bootstrap an admin with `backend/scripts/createAdmin.js`.
 

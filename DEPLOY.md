@@ -21,10 +21,12 @@ Browser  ──►    │  /            → frontend/pages/login.html  (static C
                                           MongoDB Atlas
 ```
 
-- `crias/api/index.js` — serverless entry that exports the Express app.
-- `crias/backend/` — API, auth, models, and the JS ML engine (`src/ml`).
-- `crias/frontend/` — static HTML/CSS/JS served from Vercel's CDN.
-- `crias/vercel.json` — routes `/api/*` to the function, everything else to static.
+The app lives at the **repository root** (no nested folder):
+
+- `api/index.js` — serverless entry that exports the Express app.
+- `backend/` — API, auth, models, and the JS ML engine (`src/ml`).
+- `frontend/` — static HTML/CSS/JS served from Vercel's CDN.
+- `vercel.json` — routes `/api/*` to the function, everything else to static.
 
 ---
 
@@ -60,9 +62,10 @@ git push
 ## Step 3 — Import the project into Vercel (3 min)
 
 1. Go to **https://vercel.com/new** and import your GitHub repo.
-2. **Root Directory**: set it to **`crias`** (the folder containing `vercel.json`).
-   This is important — the config and `package.json` live there.
-3. Framework preset: **Other**. Leave build/output settings empty (vercel.json handles it).
+2. **Root Directory**: leave it as the **repository root** (the default `./`) —
+   `vercel.json` and `package.json` are at the root now, so no change is needed.
+3. Framework / Application Preset: choose **Other** (NOT "Services").
+   Leave build/output/install settings empty (vercel.json handles it).
 4. Add the environment variables in Step 4 **before** clicking Deploy.
 
 ---
@@ -97,7 +100,7 @@ Click **Deploy**.
 ## Step 5 — Create the first admin user
 
 Registration creates `analyst` accounts. To get an admin, run the bootstrap
-script once against your Atlas DB (from the `crias/` folder locally):
+script once against your Atlas DB (from the repo root locally):
 
 ```bash
 # install deps once
@@ -136,30 +139,24 @@ The Google button is hidden until you configure a real Client ID.
 ## Local development
 
 ```bash
-cd crias
-npm install                 # installs backend deps at the root
-# Option A: run against local MongoDB
-#   set MONGODB_URI=mongodb://localhost:27017/crias in a .env file
+# from the repo root
+npm install                 # installs deps
+# create backend/.env with at least MONGODB_URI and JWT_SECRET
 npm run dev                 # http://localhost:3000/pages/login.html
 ```
 
 The same app runs locally (Express `listen`) and on Vercel (serverless export).
+Add mock firms/predictions with `node backend/scripts/seedMockData.js`.
 
 ---
 
-## Regenerating the ML models (optional)
+## About the ML models
 
-The Node engine reads `backend/src/ml/models.json`, exported from the original
-scikit-learn models. To regenerate (e.g. after retraining):
-
-```bash
-cd crias/ai-service
-pip install scikit-learn numpy joblib
-python export_models.py     # writes ../backend/src/ml/models.json + validates parity
-```
-
-The exporter asserts the JS-reproducible math matches sklearn's `predict_proba`
-to < 1e-9 before writing.
+The Node engine reads `backend/src/ml/models.json` (a 72 KB export of the
+original scikit-learn models). It is committed, so nothing extra is needed to
+run or deploy. The original Python exporter (`ai-service/export_models.py`) that
+produced it — and validated the JS math matches sklearn's `predict_proba` to
+< 1e-9 — lives in the git history if you ever need to retrain and re-export.
 
 ---
 
@@ -169,6 +166,6 @@ to < 1e-9 before writing.
 |---------|-----|
 | `503 Database connection failed` | Check `MONGODB_URI` and that Atlas allows `0.0.0.0/0`. |
 | `/api/health` shows `db: error` | Same as above; verify user/password in the SRV string. |
-| Blank page / 404 on assets | Confirm Vercel **Root Directory** is `crias`. |
+| `404: NOT_FOUND` / blank page | Root Directory must be the **repo root** (default), and Application Preset **Other** (not "Services"). |
 | Can't reach admin pages | Run the `createAdmin.js` script (Step 5). |
 | Google button missing | Expected until `GOOGLE_CLIENT_ID` + `data-client_id` are set. |
