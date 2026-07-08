@@ -1,104 +1,174 @@
-# 🚀 CRIAS Deployment Guide
+# 🚀 CRIAS Deployment Guide (Vercel)
 
-## Deploy to Railway (Free Tier) - 15 minutes
+CRIAS now deploys as a **single Vercel project**. The frontend (static files) and
+the backend API (Express serverless function) ship together, and the ML models
+run **in-process in Node** — there is no separate Python service to host.
 
----
-
-## Step 1: Create MongoDB Atlas Database (5 min)
-
-1. Go to **https://cloud.mongodb.com** → Sign up (free)
-2. Create a **FREE shared cluster** (M0)
-3. Go to **Database Access** → **Add Database User**:
-   - Username: `crias_user`
-   - Password: Generate & **SAVE IT**
-4. Go to **Network Access** → **Add IP Address** → **Allow Access from Anywhere**
-5. Go to **Database** → **Connect** → **Connect your application**
-6. Copy connection string:
-   ```
-   mongodb+srv://crias_user:<password>@cluster0.xxxxx.mongodb.net/crias
-   ```
-   Replace `<password>` with your password
+You only need two things: a **MongoDB Atlas** database and a **Vercel** account.
 
 ---
 
-## Step 2: Push to GitHub (2 min)
+## Architecture on Vercel
 
-```bash
-cd /Users/apple/Desktop/CRIAS
-
-# Create repo at https://github.com/new → name it "crias"
-git remote add origin https://github.com/YOUR_USERNAME/crias.git
-git push -u origin main
+```
+                ┌──────────────────────── Vercel ────────────────────────┐
+Browser  ──►    │  /            → frontend/pages/login.html  (static CDN)  │
+                │  /pages/*, /css/*, /js/*  → static files    (static CDN)  │
+                │  /api/*       → api/index.js  → Express app (serverless)  │
+                │                   └─ backend/src/ml  (JS ML engine)       │
+                └──────────────────────────────┬──────────────────────────┘
+                                                │
+                                          MongoDB Atlas
 ```
 
----
-
-## Step 3: Deploy on Railway (8 min)
-
-### 3A: Create Project & Deploy AI Service
-
-1. Go to **https://railway.app** → Sign in with GitHub
-2. Click **New Project** → **Deploy from GitHub repo**
-3. Select your `crias` repo
-4. Click the service → **Settings**:
-   - **Root Directory**: `crias/ai-service`
-   - **Start Command**: `gunicorn app:app --bind 0.0.0.0:$PORT`
-5. **Variables** tab → Add:
-   ```
-   FLASK_ENV=production
-   ```
-6. **Settings** → **Networking** → **Generate Domain**
-7. 📋 **Copy the AI URL** (e.g., `https://crias-ai-xxx.railway.app`)
-
-### 3B: Deploy Backend
-
-1. In same project → **New** → **GitHub Repo** → Select `crias` again
-2. Click the NEW service → **Settings**:
-   - **Root Directory**: `crias/backend`
-   - **Start Command**: `node server.js`
-3. **Variables** tab → Add all:
-   ```
-   NODE_ENV=production
-   PORT=3000
-   MONGODB_URI=mongodb+srv://crias_user:YOUR_PASSWORD@cluster0.xxxxx.mongodb.net/crias
-   JWT_SECRET=change-this-to-a-random-64-character-secret-key-here
-   AI_SERVICE_URL=https://YOUR-AI-SERVICE-URL.railway.app
-   CORS_ORIGIN=https://YOUR-BACKEND-URL.railway.app
-   ```
-4. **Settings** → **Networking** → **Generate Domain**
-5. 📋 **Copy your app URL!**
-
-### 3C: Update CORS
-
-1. Go back to Backend **Variables**
-2. Update `CORS_ORIGIN` with the backend URL you just generated
+- `crias/api/index.js` — serverless entry that exports the Express app.
+- `crias/backend/` — API, auth, models, and the JS ML engine (`src/ml`).
+- `crias/frontend/` — static HTML/CSS/JS served from Vercel's CDN.
+- `crias/vercel.json` — routes `/api/*` to the function, everything else to static.
 
 ---
 
-## ✅ Done!
+## Step 1 — Create a MongoDB Atlas database (5 min)
 
-Your app is live at: **https://YOUR-BACKEND.railway.app**
-
-| Page | URL |
-|------|-----|
-| Login | `/pages/login.html` |
-| Register | `/pages/register.html` |
-| Dashboard | `/pages/dashboard.html` |
-
----
-
-## 🔧 Troubleshooting
-
-| Issue | Fix |
-|-------|-----|
-| MongoDB error | Check password in connection string |
-| AI service 500 | Check AI service logs in Railway |
-| CORS error | Verify CORS_ORIGIN matches exactly |
-| Build fails | Check root directory is correct |
+1. Go to **https://cloud.mongodb.com** and sign up (free).
+2. Create a **free M0 shared cluster**.
+3. **Database Access → Add Database User**: create a user + password (save it).
+4. **Network Access → Add IP Address → Allow Access from Anywhere** (`0.0.0.0/0`).
+   Vercel's serverless IPs are dynamic, so this is required.
+5. **Database → Connect → Drivers**, copy the connection string and add the DB name:
+   ```
+   mongodb+srv://<user>:<password>@cluster0.xxxxx.mongodb.net/crias?retryWrites=true&w=majority
+   ```
 
 ---
 
-## 💰 Cost: FREE
+## Step 2 — Push the cleaned repo to GitHub (2 min)
 
-- Railway: $5/month free credit (plenty for this app)
-- MongoDB Atlas: Free tier (512MB)
+Secrets and `node_modules` are now git-ignored. From the repo root:
+
+```bash
+git add -A
+git commit -m "Production-ready: in-process ML, serverless backend, secrets removed"
+git push
+```
+
+> ⚠️ The old dev `JWT_SECRET` was previously committed to git history. It is now
+> untracked, but treat it as compromised — use a fresh secret in production (below).
+
+---
+
+## Step 3 — Import the project into Vercel (3 min)
+
+1. Go to **https://vercel.com/new** and import your GitHub repo.
+2. **Root Directory**: set it to **`crias`** (the folder containing `vercel.json`).
+   This is important — the config and `package.json` live there.
+3. Framework preset: **Other**. Leave build/output settings empty (vercel.json handles it).
+4. Add the environment variables in Step 4 **before** clicking Deploy.
+
+---
+
+## Step 4 — Environment variables (Vercel → Project → Settings → Environment Variables)
+
+| Variable          | Required | Value                                                                 |
+|-------------------|----------|-----------------------------------------------------------------------|
+| `MONGODB_URI`     | ✅       | Your Atlas SRV string from Step 1                                     |
+| `JWT_SECRET`      | ✅       | A 64+ char random string (see below)                                  |
+| `NODE_ENV`        | ✅       | `production`                                                          |
+| `JWT_EXPIRY`      | ⬜       | `24h` (default)                                                       |
+| `BCRYPT_ROUNDS`   | ⬜       | `10` (default)                                                        |
+| `CORS_ORIGIN`     | ⬜       | Leave unset (same-origin). Set to your domain to restrict.            |
+| `GOOGLE_CLIENT_ID`| ⬜       | Only if you enable Google Sign-In (Step 6)                            |
+
+Generate a fresh `JWT_SECRET`:
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+```
+A ready-to-use one (rotate anytime):
+```
+e14ca5b84ee4d5a05822723d763f856c252bbfd46701a47ac4f0de33ac0554bff765cbfede98e91b04fa9c5e6e98ab8b
+```
+
+> `AI_SERVICE_URL` is **no longer used** — the ML runs in Node.
+
+Click **Deploy**.
+
+---
+
+## Step 5 — Create the first admin user
+
+Registration creates `analyst` accounts. To get an admin, run the bootstrap
+script once against your Atlas DB (from the `crias/` folder locally):
+
+```bash
+# install deps once
+npm install
+# create the admin (set MONGODB_URI first, or put it in a local .env)
+MONGODB_URI="your-atlas-uri" node backend/scripts/createAdmin.js "Your Name" you@example.com "StrongPass123"
+```
+
+If the email already exists it is promoted to admin. Then log in at `/pages/login.html`.
+
+---
+
+## Step 6 — (Optional) Enable Google Sign-In
+
+The Google button is hidden until you configure a real Client ID.
+
+1. In **Google Cloud Console**, create an OAuth 2.0 **Web** client.
+2. Authorized JavaScript origins: `https://your-app.vercel.app`.
+3. Put the Client ID in **two** places:
+   - Vercel env var `GOOGLE_CLIENT_ID`
+   - `frontend/pages/login.html` → `data-client_id="..."`
+4. Redeploy. The button now appears.
+
+---
+
+## Verify the deployment
+
+| Check | Expected |
+|-------|----------|
+| `GET https://your-app.vercel.app/api/health` | `{"status":"ok","db":"connected",...}` |
+| `/` | Login page loads |
+| Register → create firm → submit data → analyze | PD score + SHAP chart + strategies render |
+
+---
+
+## Local development
+
+```bash
+cd crias
+npm install                 # installs backend deps at the root
+# Option A: run against local MongoDB
+#   set MONGODB_URI=mongodb://localhost:27017/crias in a .env file
+npm run dev                 # http://localhost:3000/pages/login.html
+```
+
+The same app runs locally (Express `listen`) and on Vercel (serverless export).
+
+---
+
+## Regenerating the ML models (optional)
+
+The Node engine reads `backend/src/ml/models.json`, exported from the original
+scikit-learn models. To regenerate (e.g. after retraining):
+
+```bash
+cd crias/ai-service
+pip install scikit-learn numpy joblib
+python export_models.py     # writes ../backend/src/ml/models.json + validates parity
+```
+
+The exporter asserts the JS-reproducible math matches sklearn's `predict_proba`
+to < 1e-9 before writing.
+
+---
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| `503 Database connection failed` | Check `MONGODB_URI` and that Atlas allows `0.0.0.0/0`. |
+| `/api/health` shows `db: error` | Same as above; verify user/password in the SRV string. |
+| Blank page / 404 on assets | Confirm Vercel **Root Directory** is `crias`. |
+| Can't reach admin pages | Run the `createAdmin.js` script (Step 5). |
+| Google button missing | Expected until `GOOGLE_CLIENT_ID` + `data-client_id` are set. |

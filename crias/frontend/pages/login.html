@@ -36,7 +36,7 @@
         </div>
       </div>
 
-      <div class="divider" style="display: flex; align-items: center; margin: 20px 0;">
+      <div class="divider" id="googleDivider" style="display: flex; align-items: center; margin: 20px 0;">
         <hr style="flex: 1; border: none; border-top: 1px solid var(--border-color);">
         <span style="padding: 0 10px; color: var(--text-muted); font-size: 14px;">or</span>
         <hr style="flex: 1; border: none; border-top: 1px solid var(--border-color);">
@@ -73,6 +73,19 @@
     if (localStorage.getItem('crias_token')) {
       window.location.href = '/pages/dashboard.html';
     }
+
+    // Hide the Google Sign-In button until a real Client ID is configured
+    // (avoids showing a broken button). Set data-client_id in this file to enable.
+    (function () {
+      const onload = document.getElementById('g_id_onload');
+      const clientId = onload && onload.getAttribute('data-client_id');
+      if (!clientId || clientId === 'YOUR_GOOGLE_CLIENT_ID') {
+        const box = document.getElementById('googleSignIn');
+        const divider = document.getElementById('googleDivider');
+        if (box) box.style.display = 'none';
+        if (divider) divider.style.display = 'none';
+      }
+    })();
 
     // Handle Google Login
     async function handleGoogleLogin(response) {

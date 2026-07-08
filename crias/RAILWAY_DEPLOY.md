@@ -1,5 +1,9 @@
 # CRIAS Monorepo - Railway Deployment
 
+> ⚠️ **OBSOLETE.** This guide describes the old two-service (Node + Python)
+> architecture. CRIAS now runs the ML in-process and deploys as a single Vercel
+> project — see **[DEPLOY.md](./DEPLOY.md)**. This file is kept for reference only.
+
 This project contains two services that need to be deployed separately on Railway.
 
 ## Services

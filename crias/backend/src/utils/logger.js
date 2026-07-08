@@ -18,7 +18,9 @@ const logger = winston.createLogger({
   ]
 });
 
-if (process.env.NODE_ENV === 'production') {
+// File transports only when running on a writable filesystem (not on Vercel,
+// whose serverless filesystem is read-only except for /tmp).
+if (process.env.NODE_ENV === 'production' && !process.env.VERCEL) {
   logger.add(new winston.transports.File({ filename: 'logs/error.log', level: 'error' }));
   logger.add(new winston.transports.File({ filename: 'logs/combined.log' }));
 }

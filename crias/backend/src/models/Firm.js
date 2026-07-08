@@ -34,8 +34,7 @@ const firmSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Indexes
-firmSchema.index({ firmCode: 1 });
+// Indexes (firmCode is already indexed via `unique: true`)
 firmSchema.index({ createdBy: 1 });
 firmSchema.index({ assignedManager: 1 });
 

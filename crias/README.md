@@ -1,35 +1,39 @@
 # CRIAS - Credit Risk Intelligence & Advisory System
 
-A full-stack ML-powered credit risk assessment platform.
+A full-stack ML-powered credit risk assessment platform. The ML models
+(prediction, SHAP-style explanations, counterfactuals, RCES ranking) run
+**natively in Node** — no separate Python service is needed to run the app.
+It deploys as a single Vercel project. See [DEPLOY.md](./DEPLOY.md).
 
 ## Quick Start (Local Development)
 
 ### Prerequisites
 - Node.js 18+
-- Python 3.9+
 - MongoDB (local or Atlas)
 
-### 1. Start MongoDB
+### 1. Start MongoDB (local) or use an Atlas URI
 ```bash
 mongod
 ```
 
-### 2. Start Backend
+### 2. Configure environment
 ```bash
-cd crias/backend
-npm install
-npm start
+cd crias
+cp backend/.env.example backend/.env   # then edit MONGODB_URI + JWT_SECRET
 ```
 
-### 3. Start AI Service
+### 3. Start the app (frontend + API + ML together)
 ```bash
-cd crias/ai-service
-pip install -r requirements.txt
-python app.py
+npm install
+npm run dev
 ```
 
 ### 4. Access the App
 Open http://localhost:3000/pages/login.html
+
+> Python is only needed to *regenerate* `backend/src/ml/models.json` from the
+> original scikit-learn models (see `ai-service/export_models.py`). It is not
+> required to run or deploy the app.
 
 ## Google OAuth Setup
 
@@ -46,48 +50,22 @@ Open http://localhost:3000/pages/login.html
 
 ## Vercel Deployment
 
-### 1. Install Vercel CLI
-```bash
-npm i -g vercel
-```
+Full step-by-step instructions are in **[DEPLOY.md](./DEPLOY.md)**. In short:
 
-### 2. Set up Environment Variables
-In Vercel dashboard, add these secrets:
-- `mongodb_uri` - MongoDB Atlas connection string
-- `jwt_secret` - 64+ character secret key
-- `google_client_id` - Google OAuth client ID
-- `ai_service_url` - URL of deployed AI service
+1. Create a MongoDB Atlas cluster (allow access from `0.0.0.0/0`).
+2. Import the repo into Vercel, set **Root Directory = `crias`**.
+3. Add env vars: `MONGODB_URI`, `JWT_SECRET`, `NODE_ENV=production`.
+4. Deploy, then bootstrap an admin with `backend/scripts/createAdmin.js`.
 
-### 3. Deploy
-```bash
-cd crias
-vercel
-```
-
-### AI Service Deployment
-The Python AI service needs to be deployed separately:
-
-**Option A: Railway.app**
-```bash
-cd ai-service
-railway init
-railway up
-```
-
-**Option B: Render.com**
-- Connect GitHub repo
-- Set build command: `pip install -r requirements.txt`
-- Set start command: `gunicorn app:app`
-
-**Option C: Use Vercel Serverless (limited)**
-Convert to Vercel Python functions (recommended for simple cases)
+There is **no separate AI service to deploy** — the ML runs in the Node backend.
 
 ## Tech Stack
 
 - **Frontend**: HTML5, CSS3, Vanilla JavaScript, Chart.js
 - **Backend**: Node.js, Express, MongoDB, Mongoose
-- **AI Service**: Python, Flask, scikit-learn, SHAP
-- **Auth**: JWT + bcrypt + Google OAuth
+- **ML engine**: In-process JavaScript (`backend/src/ml`), ported from the
+  scikit-learn models and validated to match `predict_proba` to < 1e-9
+- **Auth**: JWT + bcrypt + Google OAuth (optional)
 
 ## Features
 
@@ -102,22 +80,19 @@ Convert to Vercel Python functions (recommended for simple cases)
 
 ## Environment Variables
 
-### Backend (.env)
+See `backend/.env.example` for the full annotated list. Core variables:
+
 ```
-PORT=3000
-MONGODB_URI=mongodb://localhost:27017/crias
-JWT_SECRET=your-64-char-secret
-JWT_EXPIRY=24h
-AI_SERVICE_URL=http://localhost:5001
-GOOGLE_CLIENT_ID=your-google-client-id
-CORS_ORIGIN=http://localhost:3000
+MONGODB_URI=mongodb://localhost:27017/crias   # required (Atlas SRV in prod)
+JWT_SECRET=<64+ char random string>           # required
+NODE_ENV=development                          # production on Vercel
+JWT_EXPIRY=24h                                # optional
+BCRYPT_ROUNDS=10                              # optional
+CORS_ORIGIN=                                  # optional (unset = same-origin)
+GOOGLE_CLIENT_ID=                             # optional (enables Google Sign-In)
 ```
 
-### AI Service (.env)
-```
-FLASK_PORT=5001
-FLASK_ENV=development
-```
+> `AI_SERVICE_URL` is no longer used — the ML engine runs in-process.
 
 ## License
 MIT
