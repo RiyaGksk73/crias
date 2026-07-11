@@ -37,6 +37,13 @@ router.post('/',
   predictController.predict
 );
 
+// GET /api/predict/prediction/:predictionId - Single prediction details
+router.get('/prediction/:predictionId',
+  [param('predictionId').isMongoId().withMessage('Invalid prediction ID')],
+  validate,
+  predictController.getPrediction
+);
+
 // GET /api/predict/:firmId - Prediction history
 router.get('/:firmId',
   [

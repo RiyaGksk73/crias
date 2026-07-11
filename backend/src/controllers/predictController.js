@@ -95,6 +95,31 @@ exports.predict = async (req, res, next) => {
   }
 };
 
+// Get a single prediction by ID
+exports.getPrediction = async (req, res, next) => {
+  try {
+    const { predictionId } = req.params;
+
+    const prediction = await Prediction.findById(predictionId)
+      .populate('entryId', 'reportingPeriod raw features')
+      .populate('firmId', 'firmName firmCode')
+      .populate('createdBy', 'fullName');
+
+    if (!prediction) {
+      return res.status(404).json({
+        type: 'https://httpstatuses.com/404',
+        title: 'Not Found',
+        status: 404,
+        detail: 'Prediction not found'
+      });
+    }
+
+    res.json({ prediction });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Get prediction history for a firm
 exports.getHistory = async (req, res, next) => {
   try {

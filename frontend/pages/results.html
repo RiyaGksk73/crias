@@ -131,70 +131,104 @@
       window.location.href = '/pages/dashboard.html';
     }
 
-    async function loadPrediction() {
-      try {
-        // Get prediction details - need to construct from available endpoints
-        // We'll use the explain endpoint which includes prediction info
-        const explainResult = await api.explain(predictionId);
-        
-        // Load the actual prediction data
-        // Since we don't have a direct get prediction endpoint, we'll parse from URL
-        // and load firm's latest prediction
-        
-        // For now, we'll show a simplified view
-        document.getElementById('pdScoreContainer').innerHTML = `
-          <div class="pd-score">
-            <div class="pd-value" id="pdValue">-</div>
-            <div class="pd-label" id="riskLabel">Loading...</div>
-          </div>
-        `;
-        
-        // Show SHAP values
-        if (explainResult.shapValues) {
-          charts.createSHAPChart('shapChart', explainResult.shapValues);
-        }
-      } catch (error) {
-        utils.showAlert(error.message, 'error');
-      }
-    }
-
     async function loadFullData() {
       try {
-        // This is a workaround since we don't have a direct prediction GET endpoint
-        // In a real app, you'd add GET /api/predict/:id endpoint
-        
         document.getElementById('pageSubtitle').textContent = `Prediction ID: ${predictionId}`;
-        
-        // Try to load SHAP explanation
-        try {
-          const explainResult = await api.explain(predictionId);
-          if (explainResult.shapValues && explainResult.shapValues.length > 0) {
-            charts.createSHAPChart('shapChart', explainResult.shapValues);
-          }
-        } catch (e) {
-          document.getElementById('shapChart').innerHTML = 
-            '<p class="text-muted">SHAP values not available</p>';
+
+        const data = await api.getPrediction(predictionId);
+        const prediction = data.prediction;
+        currentPrediction = prediction;
+
+        if (prediction.firmId?.firmName) {
+          document.getElementById('pageTitle').textContent =
+            `${prediction.firmId.firmName} - Analysis Results`;
         }
 
-        // Show placeholder for now
+        // PD score card
         document.getElementById('pdScoreContainer').innerHTML = `
           <div class="pd-score">
-            <div class="pd-value medium">--</div>
-            <div class="pd-label">Prediction loaded</div>
-            <p class="text-muted text-sm mt-md">View firm page for full details</p>
+            <div class="pd-value ${prediction.riskLabel}">${(prediction.pd * 100).toFixed(1)}%</div>
+            <div class="pd-label">${prediction.riskLabel} Risk</div>
+            <p class="text-muted text-sm mt-md">
+              ${prediction.modelUsed} • ${utils.formatDateTime(prediction.createdAt)}
+            </p>
           </div>
         `;
 
-        document.getElementById('metricsDetails').innerHTML = `
-          <p class="text-muted text-center">Metrics calculated from financial data</p>
-        `;
+        // SHAP values (stored with the prediction; fall back to explain endpoint)
+        if (prediction.shapValues && prediction.shapValues.length > 0) {
+          charts.createSHAPChart('shapChart', prediction.shapValues);
+        } else {
+          try {
+            const explainResult = await api.explain(predictionId);
+            if (explainResult.shapValues && explainResult.shapValues.length > 0) {
+              charts.createSHAPChart('shapChart', explainResult.shapValues);
+            } else {
+              document.getElementById('shapChart').innerHTML =
+                '<p class="text-muted">SHAP values not available</p>';
+            }
+          } catch (e) {
+            document.getElementById('shapChart').innerHTML =
+              '<p class="text-muted">SHAP values not available</p>';
+          }
+        }
 
-        document.getElementById('rawData').innerHTML = `
-          <p class="text-muted text-center">Financial data used for this prediction</p>
-        `;
+        // Financial metrics
+        const entry = prediction.entryId;
+        if (entry?.features) {
+          charts.createMetricsRadar('metricsChart', entry.features);
+          document.getElementById('metricsDetails').innerHTML = `
+            <div class="flex justify-between mb-sm">
+              <span class="text-muted">Current Ratio</span>
+              <strong>${entry.features.current_ratio.toFixed(2)}</strong>
+            </div>
+            <div class="flex justify-between mb-sm">
+              <span class="text-muted">Debt Ratio</span>
+              <strong>${entry.features.debt_ratio.toFixed(2)}</strong>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-muted">Liquidity Ratio</span>
+              <strong>${entry.features.liquidity_ratio.toFixed(2)}</strong>
+            </div>
+          `;
+        } else {
+          document.getElementById('metricsDetails').innerHTML =
+            '<p class="text-muted text-center">Metrics not available</p>';
+        }
+
+        // Raw input data
+        if (entry?.raw) {
+          document.getElementById('rawData').innerHTML = `
+            <div class="flex justify-between mb-sm">
+              <span class="text-muted">Reporting Period</span>
+              <strong>${utils.formatDate(entry.reportingPeriod)}</strong>
+            </div>
+            <div class="flex justify-between mb-sm">
+              <span class="text-muted">Assets</span>
+              <strong>${utils.formatCurrency(entry.raw.assets)}</strong>
+            </div>
+            <div class="flex justify-between mb-sm">
+              <span class="text-muted">Debt</span>
+              <strong>${utils.formatCurrency(entry.raw.debt)}</strong>
+            </div>
+            <div class="flex justify-between mb-sm">
+              <span class="text-muted">Cash</span>
+              <strong>${utils.formatCurrency(entry.raw.cash)}</strong>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-muted">Inventory</span>
+              <strong>${utils.formatCurrency(entry.raw.inventory)}</strong>
+            </div>
+          `;
+        } else {
+          document.getElementById('rawData').innerHTML =
+            '<p class="text-muted text-center">Input data not available</p>';
+        }
 
       } catch (error) {
         utils.showAlert(error.message, 'error');
+        document.getElementById('pdScoreContainer').innerHTML =
+          '<p class="text-muted text-center">Failed to load prediction</p>';
       }
     }
 
