@@ -169,6 +169,10 @@ class APIClient {
     return this.request(`/predict/${firmId}/latest`);
   }
 
+  async getPrediction(predictionId) {
+    return this.request(`/predict/prediction/${predictionId}`);
+  }
+
   async explain(predictionId) {
     return this.request('/predict/explain', {
       method: 'POST',

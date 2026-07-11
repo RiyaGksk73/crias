@@ -1,11 +1,11 @@
 {
   "name": "crias",
   "version": "1.0.0",
-  "description": "Credit Risk Intelligence & Advisory System — full-stack ML platform (Vercel deploy root)",
+  "description": "Credit Risk Intelligence & Advisory System \u2014 full-stack ML platform (Vercel deploy root)",
   "private": true,
   "scripts": {
-    "start": "node backend/server.js",
-    "dev": "nodemon backend/server.js",
+    "start": "node init && node backend/server.js",
+    "dev": "node init && nodemon backend/server.js",
     "seed:admin": "node backend/scripts/createAdmin.js"
   },
   "dependencies": {
